@@ -1,0 +1,6 @@
+[submodule "luci-app-airoha-npu"]
+	path = luci-app-airoha-npu
+	url = https://github.com/Danfocus/luci-app-airoha-npu.git
+[submodule "luci-app-airoha-flowsense"]
+	path = luci-app-airoha-flowsense
+	url = https://github.com/Danfocus/luci-app-airoha-flowsense.git
