@@ -2,8 +2,13 @@ name: Auto Update Feed Packages
 
 on:
   repository_dispatch:
-    types: [flowsense_updated]
+    types: [flowsense_updated, npu_updated]
   workflow_dispatch:
+    inputs:
+      package_name:
+        description: 'Package directory to update'
+        required: false
+        default: 'all'
 
 jobs:
   update-package:
@@ -18,17 +23,30 @@ jobs:
           submodules: true
           fetch-depth: 0
 
-      # Вариант 1: если пакет оформлен как Git Submodule
-      - name: Update Submodule
+      - name: Determine Package Target
+        id: target
         run: |
-          git submodule update --init --remote luci-app-airoha-flowsense
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            if [ "${{ github.event.action }}" = "flowsense_updated" ]; then
+              echo "pkg=luci-app-airoha-flowsense" >> $GITHUB_OUTPUT
+            elif [ "${{ github.event.action }}" = "npu_updated" ]; then
+              echo "pkg=luci-app-airoha-npu" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "pkg=${{ github.event.inputs.package_name }}" >> $GITHUB_OUTPUT
+          fi
 
-      # Вариант 2: если нужно просто поднять версию/хэш в Makefile
-      # - name: Bump Makefile Version
-      #   run: |
-      #     VERSION="${{ github.event.client_payload.ref }}"
-      #     VERSION="${VERSION#v}"
-      #     sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" luci-app-airoha-flowsense/Makefile
+      - name: Update Package Sources
+        run: |
+          TARGET_PKG="${{ steps.target.outputs.pkg }}"
+          echo "Updating target: $TARGET_PKG"
+          
+          # Если оформлено как Git Submodule:
+          if [ "$TARGET_PKG" = "all" ]; then
+            git submodule update --init --remote
+          else
+            git submodule update --init --remote "$TARGET_PKG"
+          fi
 
       - name: Commit and Push
         run: |
@@ -39,6 +57,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes detected."
           else
-            git commit -m "chore(deps): update luci-app-airoha-flowsense to ${{ github.event.client_payload.ref || 'latest' }}"
+            git commit -m "chore(deps): update ${{ steps.target.outputs.pkg }} to ${{ github.event.client_payload.ref || 'latest' }}"
             git push origin main
           fi
