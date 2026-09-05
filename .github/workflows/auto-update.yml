@@ -1,0 +1,44 @@
+name: Auto Update Feed Packages
+
+on:
+  repository_dispatch:
+    types: [flowsense_updated]
+  workflow_dispatch:
+
+jobs:
+  update-package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Feed Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      # Вариант 1: если пакет оформлен как Git Submodule
+      - name: Update Submodule
+        run: |
+          git submodule update --init --remote luci-app-airoha-flowsense
+
+      # Вариант 2: если нужно просто поднять версию/хэш в Makefile
+      # - name: Bump Makefile Version
+      #   run: |
+      #     VERSION="${{ github.event.client_payload.ref }}"
+      #     VERSION="${VERSION#v}"
+      #     sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" luci-app-airoha-flowsense/Makefile
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes detected."
+          else
+            git commit -m "chore(deps): update luci-app-airoha-flowsense to ${{ github.event.client_payload.ref || 'latest' }}"
+            git push origin main
+          fi
